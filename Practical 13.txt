@@ -1,0 +1,81 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from keras.datasets import mnist
+from keras.models import Model
+from keras.layers import Input, Dense, Flatten, Reshape
+from keras.optimizers import Adam
+from keras import backend as K
+
+# Load the MNIST dataset
+(x_train, _), (x_test, _) = mnist.load_data()
+
+# Normalize the pixel values (0-255) to the range [0, 1]
+x_train = x_train.astype('float32') / 255.
+x_test = x_test.astype('float32') / 255.
+
+# Flatten the images for the autoencoder (28x28 -> 784)
+x_train = x_train.reshape((x_train.shape[0], 28 * 28))
+x_test = x_test.reshape((x_test.shape[0], 28 * 28))
+
+print(x_train.shape)  # (60000, 784)
+print(x_test.shape)   # (10000, 784)
+
+# Dimensionality of the encoded (latent) space
+encoding_dim = 32  # You can try changing this value to vary the level of compression
+
+# Input placeholder for 28x28 images
+input_img = Input(shape=(784,))
+
+# Encoder: Compress the input data
+encoded = Dense(encoding_dim, activation='relu')(input_img)
+
+# Decoder: Reconstruct the data from the compressed representation
+decoded = Dense(784, activation='sigmoid')(encoded)
+
+# Autoencoder model: Input -> Encoder -> Decoder -> Output
+autoencoder = Model(input_img, decoded)
+
+# Compile the autoencoder
+autoencoder.compile(optimizer=Adam(), loss='binary_crossentropy')
+
+# Train the autoencoder
+autoencoder.fit(x_train, x_train,
+                epochs=50,
+                batch_size=256,
+                shuffle=True,
+                validation_data=(x_test, x_test))
+
+# Encode and decode some digits
+decoded_imgs = autoencoder.predict(x_test)
+
+# Reshape back to 28x28 images for visualization
+decoded_imgs = decoded_imgs.reshape((decoded_imgs.shape[0], 28, 28))
+x_test = x_test.reshape((x_test.shape[0], 28, 28))
+
+# Plot the original and reconstructed images
+n = 10  # How many digits we will display
+plt.figure(figsize=(20, 4))
+
+for i in range(n):
+    # Display original
+    ax = plt.subplot(2, n, i + 1)
+    plt.imshow(x_test[i], cmap='gray')
+    plt.title("Original")
+    plt.axis('off')
+
+    # Display reconstruction
+    ax = plt.subplot(2, n, i + 1 + n)
+    plt.imshow(decoded_imgs[i], cmap='gray')
+    plt.title("Reconstructed")
+    plt.axis('off')
+
+plt.show()
+
+# Define the encoder model
+encoder = Model(input_img, encoded)
+
+# Compress the test data
+encoded_imgs = encoder.predict(x_test.reshape(-1, 784))
+
+print("Original data shape: ", x_test.shape)
+print("Compressed data shape: ", encoded_imgs.shape)
